@@ -1,6 +1,8 @@
 import abc
 from typing import Coroutine, Any
 
+import asyncio
+
 """
 Описание задачи:
     Необходимо реализовать планировщик, позволяющий запускать и отслеживать фоновые корутины.
@@ -38,7 +40,7 @@ class AbstractRegistrator(abc.ABC):
 
 class AbstractWatcher(abc.ABC):
     """
-    Абстрактный интерфейс, которому должна соответсововать ваша реализация Watcher.
+    Абстрактный интерфейс, которому должна соответствовать ваша реализация Watcher.
     При тестировании мы расчитываем на то, что этот интерфейс будет соблюден.
     """
 
@@ -65,16 +67,32 @@ class StudentWatcher(AbstractWatcher):
     def __init__(self, registrator: AbstractRegistrator):
         super().__init__(registrator)
         # Your code goes here
-        ...
 
     async def start(self) -> None:
         # Your code goes here
-        ...
+        self.tasks = []
 
     async def stop(self) -> None:
         # Your code goes here
-        ...
+        done, pending = await asyncio.wait(self.tasks, timeout=1.0)
+
+        for task in done:
+            exc = task.exception()
+            if exc:
+                self.registrator.register_error(exc)
+            else:
+                self.registrator.register_value(task.result())
+
+        for task in pending:
+            canceled = task.cancel()
+            if not canceled:
+                exc = task.exception()
+                if exc:
+                    self.registrator.register_error(exc)
+                else:
+                    self.registrator.register_value(task.result())
 
     def start_and_watch(self, coro: Coroutine) -> None:
         # Your code goes here
-        ...
+        task = asyncio.create_task(coro=coro)
+        self.tasks.append(task)
